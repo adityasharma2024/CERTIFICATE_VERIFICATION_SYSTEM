@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getInstitution } from '../utils/certificateContract';
 import { ethers } from 'ethers';
 import WalletConnect from './WalletConnect';
 import './CertificateIssuance.css'; // Add this file for styling
@@ -20,6 +21,43 @@ function CertificateIssuance() {
   const [issuanceResult, setIssuanceResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isInstitution, setIsInstitution] = useState(null);
+  const [checkingInstitution, setCheckingInstitution] = useState(true);
+  const [walletAddress, setWalletAddress] = useState('');
+
+  // Check institution status on wallet connect
+  useEffect(() => {
+    const checkInstitution = async () => {
+      if (!window.ethereum) {
+        setIsInstitution(false);
+        setCheckingInstitution(false);
+        return;
+      }
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        setWalletAddress(accounts[0]);
+        const institutionInfo = await getInstitution(accounts[0]);
+        if (institutionInfo && institutionInfo[0] && institutionInfo[0].trim() !== '') {
+          setIsInstitution(true);
+        } else {
+          setIsInstitution(false);
+        }
+      } catch (err) {
+        setIsInstitution(false);
+      }
+      setCheckingInstitution(false);
+    };
+    checkInstitution();
+    // Listen for account changes
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', checkInstitution);
+    }
+    return () => {
+      if (window.ethereum) {
+        window.ethereum.removeListener('accountsChanged', checkInstitution);
+      }
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,26 +68,21 @@ function CertificateIssuance() {
       if (!window.ethereum) {
         throw new Error('Please install MetaMask to issue certificates');
       }
-
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-
+      if (!isInstitution) {
+        throw new Error('Not a registered institution.');
+      }
+      // ...existing code for issuing certificate (simulate for now)...
       const metadata = {
         ...formData,
         issueDate: new Date().toISOString(),
-        issuer: accounts[0]
+        issuer: walletAddress
       };
-
       const fakeHash = '0x123abc456...'; // Replace with real tx hash later
-
       sessionStorage.setItem(formData.studentAddress, JSON.stringify({
         hash: fakeHash,
         metadata
       }));
-
       setIssuanceResult({ hash: fakeHash, metadata });
-
       setFormData({
         studentName: '',
         studentId: '',
@@ -61,7 +94,6 @@ function CertificateIssuance() {
         institutionAddress: '',
         studentAddress: ''
       });
-
       setFileName('');
     } catch (err) {
       setError(err.message);
@@ -71,83 +103,87 @@ function CertificateIssuance() {
   };
 
   return (
-    <div className="certificate-container">
+    <div className="certificate-container" style={{ position: 'relative' }}>
       <h2 className="title">🎓 Issue Blockchain Certificate</h2>
       <WalletConnect />
 
-      <form onSubmit={handleSubmit} className="certificate-form">
-        <div className="form-row">
-          <input type="text" placeholder="Student Name" value={formData.studentName}
-            onChange={(e) => setFormData({ ...formData, studentName: e.target.value })} required />
+      <div style={{ filter: isInstitution === false ? 'blur(4px)' : 'none', pointerEvents: isInstitution === false ? 'none' : 'auto', transition: 'filter 0.3s' }}>
+        <form onSubmit={handleSubmit} className="certificate-form">
+          <div className="form-row">
+            <input type="text" placeholder="Student Name" value={formData.studentName}
+              onChange={(e) => setFormData({ ...formData, studentName: e.target.value })} required disabled={isInstitution === false} />
+          </div>
+          <div className="form-row">
+            <input type="text" placeholder="Student ID" value={formData.studentId}
+              onChange={(e) => setFormData({ ...formData, studentId: e.target.value })} required disabled={isInstitution === false} />
+          </div>
+          <div className="form-row">
+            <input type="text" placeholder="Course or Program" value={formData.courseProgram}
+              onChange={(e) => setFormData({ ...formData, courseProgram: e.target.value })} required disabled={isInstitution === false} />
+          </div>
+          <div className="form-row">
+            <input type="text" placeholder="Grade (e.g. A+)" value={formData.grade}
+              onChange={(e) => setFormData({ ...formData, grade: e.target.value })} required disabled={isInstitution === false} />
+          </div>
+          <div className="form-row">
+            <input type="date" value={formData.completionDate}
+              onChange={(e) => setFormData({ ...formData, completionDate: e.target.value })} required disabled={isInstitution === false} />
+          </div>
+          <div className="form-row file-upload">
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png"
+              onChange={(e) => {
+                setFormData({ ...formData, certificateFile: e.target.files[0] });
+                setFileName(e.target.files[0]?.name || '');
+              }} required disabled={isInstitution === false} />
+            {fileName && <span className="file-name">📎 {fileName}</span>}
+          </div>
+          <div className="form-row">
+            <select value={formData.institutionCategory}
+              onChange={(e) => setFormData({ ...formData, institutionCategory: e.target.value })} required disabled={isInstitution === false}>
+              <option value="">Select Institution Category</option>
+              <option value="Secondary School">Secondary School</option>
+              <option value="TVET School">TVET School</option>
+              <option value="University">University</option>
+            </select>
+          </div>
+          <div className="form-row">
+            <input type="text" placeholder="Institution Blockchain Address"
+              value={formData.institutionAddress}
+              onChange={(e) => setFormData({ ...formData, institutionAddress: e.target.value })} required disabled={isInstitution === false} />
+          </div>
+          <div className="form-row">
+            <input type="text" placeholder="Student Blockchain Address"
+              value={formData.studentAddress}
+              onChange={(e) => setFormData({ ...formData, studentAddress: e.target.value })} required disabled={isInstitution === false} />
+          </div>
+          <button type="submit" className="submit-btn" disabled={loading || isInstitution === false}>
+            {loading ? '🔄 Issuing Certificate...' : '🚀 Issue Certificate'}
+          </button>
+        </form>
+        {issuanceResult && (
+          <div className="result-box success">
+            ✅ Certificate issued!
+            <div>
+              <strong>Hash:</strong> <code>{issuanceResult.hash}</code>
+              <button onClick={() => navigator.clipboard.writeText(issuanceResult.hash)} className="copy-btn">Copy</button>
+            </div>
+          </div>
+        )}
+        {error && <div className="result-box error">❌ {error}</div>}
+      </div>
+      {/* Overlay for not registered institution */}
+      {checkingInstitution ? (
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+          <div style={{ fontSize: 20, fontWeight: 'bold', color: '#333' }}>Checking institution status...</div>
         </div>
-
-        <div className="form-row">
-          <input type="text" placeholder="Student ID" value={formData.studentId}
-            onChange={(e) => setFormData({ ...formData, studentId: e.target.value })} required />
-        </div>
-
-        <div className="form-row">
-          <input type="text" placeholder="Course or Program" value={formData.courseProgram}
-            onChange={(e) => setFormData({ ...formData, courseProgram: e.target.value })} required />
-        </div>
-
-        <div className="form-row">
-          <input type="text" placeholder="Grade (e.g. A+)" value={formData.grade}
-            onChange={(e) => setFormData({ ...formData, grade: e.target.value })} required />
-        </div>
-
-        <div className="form-row">
-          <input type="date" value={formData.completionDate}
-            onChange={(e) => setFormData({ ...formData, completionDate: e.target.value })} required />
-        </div>
-
-        <div className="form-row file-upload">
-          <input type="file" accept=".pdf,.jpg,.jpeg,.png"
-            onChange={(e) => {
-              setFormData({ ...formData, certificateFile: e.target.files[0] });
-              setFileName(e.target.files[0]?.name || '');
-            }} required />
-          {fileName && <span className="file-name">📎 {fileName}</span>}
-        </div>
-
-        <div className="form-row">
-          <select value={formData.institutionCategory}
-            onChange={(e) => setFormData({ ...formData, institutionCategory: e.target.value })} required>
-            <option value="">Select Institution Category</option>
-            <option value="Secondary School">Secondary School</option>
-            <option value="TVET School">TVET School</option>
-            <option value="University">University</option>
-          </select>
-        </div>
-
-        <div className="form-row">
-          <input type="text" placeholder="Institution Blockchain Address"
-            value={formData.institutionAddress}
-            onChange={(e) => setFormData({ ...formData, institutionAddress: e.target.value })} required />
-        </div>
-
-        <div className="form-row">
-          <input type="text" placeholder="Student Blockchain Address"
-            value={formData.studentAddress}
-            onChange={(e) => setFormData({ ...formData, studentAddress: e.target.value })} required />
-        </div>
-
-        <button type="submit" className="submit-btn" disabled={loading}>
-          {loading ? '🔄 Issuing Certificate...' : '🚀 Issue Certificate'}
-        </button>
-      </form>
-
-      {issuanceResult && (
-        <div className="result-box success">
-          ✅ Certificate issued!
-          <div>
-            <strong>Hash:</strong> <code>{issuanceResult.hash}</code>
-            <button onClick={() => navigator.clipboard.writeText(issuanceResult.hash)} className="copy-btn">Copy</button>
+      ) : isInstitution === false && (
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+          <div style={{ fontSize: 22, fontWeight: 'bold', color: '#c00', textAlign: 'center', padding: 24, borderRadius: 8, background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+            Not a registered institution<br />
+            Only registered institutions can generate certificates.
           </div>
         </div>
       )}
-
-      {error && <div className="result-box error">❌ {error}</div>}
     </div>
   );
 }

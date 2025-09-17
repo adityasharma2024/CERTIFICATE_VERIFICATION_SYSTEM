@@ -1,16 +1,28 @@
 import React, { useState } from 'react';
-import './RetrieveCertificate.css'; // Create this CSS file
+import './RetrieveCertificate.css';
 
 function RetrieveCertificate() {
   const [studentAddress, setStudentAddress] = useState('');
+  const [studentId, setStudentId] = useState('');
   const [certificateData, setCertificateData] = useState(null);
   const [error, setError] = useState('');
 
   const handleRetrieve = () => {
     setError('');
+    if (!studentAddress.trim() || !studentId.trim()) {
+      setCertificateData(null);
+      setError('Please enter both Student Ethereum Address and Student ID.');
+      return;
+    }
     const data = sessionStorage.getItem(studentAddress.trim());
     if (data) {
-      setCertificateData(JSON.parse(data));
+      const parsed = JSON.parse(data);
+      if (parsed.metadata && parsed.metadata.studentId === studentId.trim()) {
+        setCertificateData(parsed);
+      } else {
+        setCertificateData(null);
+        setError('No certificate found for this address and student ID.');
+      }
     } else {
       setCertificateData(null);
       setError('No certificate found for this address.');
@@ -24,11 +36,22 @@ function RetrieveCertificate() {
       <div className="form-group">
         <input
           type="text"
+          placeholder="Enter Student ID"
+          value={studentId}
+          onChange={(e) => setStudentId(e.target.value)}
+          className="input"
+        />
+      </div>
+      <div className="form-group">
+        <input
+          type="text"
           placeholder="Enter Student Blockchain Address"
           value={studentAddress}
           onChange={(e) => setStudentAddress(e.target.value)}
           className="input"
         />
+      </div>
+      <div className="form-group">
         <button onClick={handleRetrieve} className="retrieve-btn">
           🔍 Retrieve Certificate
         </button>

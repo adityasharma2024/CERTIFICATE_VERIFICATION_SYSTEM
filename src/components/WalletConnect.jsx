@@ -26,7 +26,7 @@ function WalletConnect() {
       try {
         const accounts = await provider.listAccounts();
         if (accounts.length > 0) {
-          setAccount(accounts[0].address);
+          setAccount(accounts[0].address || accounts[0]);
           setIsConnected(true);
         }
       } catch (error) {
@@ -45,19 +45,63 @@ function WalletConnect() {
     }
   };
 
+  // ✅ Switch to Sepolia network, add if missing
+  const switchToSepolia = async () => {
+    const SEPOLIA_CHAIN_ID = "0xaa36a7"; // 11155111 in hex
+    if (!window.ethereum) return false;
+
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: SEPOLIA_CHAIN_ID }],
+      });
+      return true; // switched successfully
+    } catch (error) {
+      if (error.code === 4902) {
+        try {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [{
+              chainId: SEPOLIA_CHAIN_ID,
+              chainName: "Sepolia Test Network",
+              rpcUrls: ["https://rpc.sepolia.org"],
+              nativeCurrency: { name: "Sepolia ETH", symbol: "ETH", decimals: 18 },
+              blockExplorerUrls: ["https://sepolia.etherscan.io"],
+            }],
+          });
+          return true; // added & switched
+        } catch (addError) {
+          console.error("Failed to add Sepolia:", addError);
+          return false;
+        }
+      } else {
+        console.error("Failed to switch network:", error);
+        return false;
+      }
+    }
+  };
+
   const connectWallet = async () => {
     try {
-      if (window.ethereum) {
-        const accounts = await window.ethereum.request({
-          method: 'eth_requestAccounts'
-        });
-        setAccount(accounts[0]);
-        setIsConnected(true);
-      } else {
-        alert('Please install MetaMask to use this application');
+      if (!window.ethereum) {
+        alert("Please install MetaMask to use this app");
+        return;
       }
+
+      const switched = await switchToSepolia();
+      if (!switched) {
+        alert("Please switch to Sepolia Testnet in MetaMask");
+        return;
+      }
+
+      const accounts = await window.ethereum.request({
+        method: 'eth_requestAccounts'
+      });
+      setAccount(accounts[0]);
+      setIsConnected(true);
+
     } catch (error) {
-      console.error('Error connecting wallet:', error);
+      console.error("Error connecting wallet:", error);
     }
   };
 

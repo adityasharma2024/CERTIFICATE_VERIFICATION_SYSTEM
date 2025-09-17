@@ -59,7 +59,7 @@ export const verifyCertificate = async (certificateId) => {
     try {
         const contract = await getContract();
         const result = await contract.verifyCertificate(certificateId);
-        
+
         // Handle the case where the result is undefined or invalid
         if (!result || !Array.isArray(result) || result.length < 2) {
             throw new Error('Invalid response from contract');
@@ -145,6 +145,17 @@ export const revokeIssuerRole = async (address) => {
         return true;
     } catch (error) {
         console.error('Error revoking issuer role:', error);
+        throw error;
+    }
+};
+
+// Get institution info by address
+export const getInstitution = async (address) => {
+    try {
+        const contract = await getContract();
+        return await contract.getInstitution(address);
+    } catch (error) {
+        console.error('Error fetching institution info:', error);
         throw error;
     }
 };
