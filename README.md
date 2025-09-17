@@ -1,3 +1,9 @@
+terminal a : npx hardhat node
+terminal b : npx hardhat run scripts/deploy.js --network sepolia
+terminal c : npm run dev
+
+
+
 Certificate Verification Smart Contract
 This smart contract enables the registration of institutions and the issuance, verification, and revocation of certificates on the Ethereum blockchain. 
 Table of Contents
